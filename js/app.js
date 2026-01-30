@@ -120,11 +120,35 @@
     currentStep: 0, // 0 = welcome, 1-5 = questions, 6 = results, 7 = email, 8 = cta
     answers: {},
     score: 0,
-    level: null
+    level: null,
+    isSharedView: false
   };
+
+  // Check for shared results in URL
+  function loadSharedResults() {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('r');
+    if (result) {
+      const [score, level] = result.split('-');
+      const parsedScore = parseInt(score, 10);
+      if (!isNaN(parsedScore) && levelContent[level]) {
+        state.score = parsedScore;
+        state.level = level;
+        state.currentStep = questions.length + 1;
+        state.isSharedView = true;
+        return true;
+      }
+    }
+    return false;
+  }
 
   // Load state from localStorage
   function loadState() {
+    // First check for shared results in URL
+    if (loadSharedResults()) {
+      return;
+    }
+
     try {
       const saved = localStorage.getItem('clonk_advisor_state');
       if (saved) {
@@ -316,6 +340,14 @@
 
           <div class="card animate">
             <div class="cta-section">
+              ${state.isSharedView ? `
+                <p style="color: #5a7a8a; margin-bottom: 16px; font-size: 14px;">Estás viendo el resultado de otra persona</p>
+                <button class="btn btn-primary btn-full" onclick="app.startOwnTest()">
+                  Hacer mi propio diagnóstico
+                  <span class="icon">→</span>
+                </button>
+                <div style="margin: 24px 0; border-top: 1px solid #e0e5e7;"></div>
+              ` : ''}
               <h3>¿Quieres optimizar tu gestión de turnos?</h3>
               <p style="color: #5a7a8a; margin-bottom: 0;">Clonk te ayuda a reducir horas extras y mejorar la satisfacción de tu equipo.</p>
               <div class="cta-buttons">
@@ -323,16 +355,18 @@
                   Agenda una demo de Clonk
                   <span class="icon">→</span>
                 </a>
-                <button class="btn btn-secondary btn-full" onclick="app.shareResults()">
-                  <span class="icon">📤</span>
-                  Compartir mi resultado
-                </button>
-                <div class="share-success" id="share-success">
-                  ¡Link copiado al portapapeles!
-                </div>
-                <button class="btn btn-link" onclick="app.restart()">
-                  Volver a empezar
-                </button>
+                ${!state.isSharedView ? `
+                  <button class="btn btn-secondary btn-full" onclick="app.shareResults()">
+                    <span class="icon">📤</span>
+                    Compartir mi resultado
+                  </button>
+                  <div class="share-success" id="share-success">
+                    ¡Link copiado al portapapeles!
+                  </div>
+                  <button class="btn btn-link" onclick="app.restart()">
+                    Volver a empezar
+                  </button>
+                ` : ''}
               </div>
             </div>
           </div>
@@ -441,8 +475,10 @@
     },
 
     shareResults() {
-      const shareUrl = window.location.href;
-      const shareText = `Mi nivel de madurez en gestión de turnos es "${levelContent[state.level].name}" con ${state.score} puntos. ¡Descubre el tuyo!`;
+      const baseUrl = window.location.origin + window.location.pathname;
+      const shareUrl = `${baseUrl}?r=${state.score}-${state.level}`;
+      const level = levelContent[state.level];
+      const shareText = `${level.icon} Mi nivel de madurez en gestión de turnos es "${level.name}" con ${state.score} puntos. ¡Descubre el tuyo!`;
 
       if (navigator.share) {
         navigator.share({
@@ -464,7 +500,22 @@
         currentStep: 0,
         answers: {},
         score: 0,
-        level: null
+        level: null,
+        isSharedView: false
+      };
+      render();
+    },
+
+    startOwnTest() {
+      // Clear URL parameters
+      window.history.replaceState({}, '', window.location.pathname);
+      clearState();
+      state = {
+        currentStep: 1,
+        answers: {},
+        score: 0,
+        level: null,
+        isSharedView: false
       };
       render();
     }
